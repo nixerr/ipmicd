@@ -790,7 +790,7 @@ doit:
 				((i>>16) & 0xff) | start_two,
 				((i>>8)  & 0xff) | start_three,
 				(i       & 0xff) | start_four);
-		printf("[TRAY] %s\n", Target);
+		printf("[TRY] %s\n", Target);
 
 		if (globalArgs.DoPing == 1)
 		{
